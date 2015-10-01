@@ -32,16 +32,16 @@ public:
 
     void run();
 
-    void set_async_timer (boost::asio::steady_timer& timer);
+    void wait(async_ctx ctx);
 
 private:
     friend class thread_pool_private;
 
     void done();
-
+    bool m_done;
     task m_task;
     boost::asio::io_service& m_io;
-    boost::asio::steady_timer* m_timer;
+    boost::asio::steady_timer * m_timer;
 };
 typedef std::shared_ptr<task_holder> task_holder_ptr;
 
@@ -53,9 +53,7 @@ public:
                  bool take_io_controll = false,
                  unsigned count = 0);
 
-    void run_and_wait (const task& task, async_ctx ctx);
-
-    void run (const task& task);
+    task_holder_ptr run (const task& task);
 
     ~thread_pool();
 
@@ -63,6 +61,8 @@ private:
     std::unique_ptr<thread_pool_private> d;
 
 };
+
+void wait_all(const std::vector<task_holder_ptr> & tasks, async_ctx ctx);
 
 }
 

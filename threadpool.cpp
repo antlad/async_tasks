@@ -81,27 +81,16 @@ public:
         }
     }
 
-    void run_and_wait (const task& task, async_ctx ctx)
+    task_holder_ptr run (const task& task)
     {
-        boost::asio::steady_timer timer (m_io,  boost::asio::steady_timer::clock_type::duration::max());
         auto task_pt = std::make_shared<task_holder> (task, m_io);
-        task_pt->set_async_timer (timer);
+
         {
             std::lock_guard<std::mutex> lock (m_inputMutex);
             m_inputTasks.push_back (task_pt);
         }
         m_waitCond.notify_one();
-        boost::system::error_code ec;
-        timer.async_wait (ctx[ec]);
-    }
-
-    void run (const task& task)
-    {
-        {
-            std::lock_guard<std::mutex> lock (m_inputMutex);
-            m_inputTasks.push_back (std::make_shared<task_holder> (task, m_io));
-        }
-        m_waitCond.notify_one();
+        return task_pt;
     }
 
     void stop()
@@ -154,21 +143,17 @@ thread_pool::~thread_pool()
     d->stop_io();
 }
 
-void thread_pool::run_and_wait (const task& task, async_ctx ctx)
+task_holder_ptr thread_pool::run (const task& task)
 {
-    d->run_and_wait (task, ctx);
-}
-
-void thread_pool::run (const task& task)
-{
-    d->run (task);
+    return d->run (task);
 }
 
 task_holder::task_holder (const task& task,
                           boost::asio::io_service& io)
-    : m_task (task)
-    , m_timer (0)
+    : m_done(false)
+    , m_task (task)
     , m_io (io)
+    , m_timer(0)
 {
 }
 
@@ -177,20 +162,35 @@ void task_holder::run()
     m_task();
 }
 
-
-void task_holder::set_async_timer (boost::asio::steady_timer& timer)
+void task_holder::wait(async_ctx ctx)
 {
+    if (m_done)
+        return;
+
+    boost::asio::steady_timer timer(m_io,  boost::asio::steady_timer::clock_type::duration::max());
     m_timer = &timer;
+    boost::system::error_code ec;
+    timer.async_wait (ctx[ec]);
 }
+
+
 
 void task_holder::done()
 {
     std::cout << "Task holder done() thread id = " << std::this_thread::get_id() << std::endl;
     std::cout.flush();
-
+    m_done = true;
     if (m_timer)
     {
         m_timer->cancel();
+    }
+}
+
+void wait_all(const std::vector<task_holder_ptr>& tasks, async_ctx ctx)
+{
+    for (const task_holder_ptr & task: tasks)
+    {
+        task->wait(ctx);
     }
 }
 

@@ -1,4 +1,5 @@
 #include <boost/asio.hpp>
+#include <boost/filesystem.hpp>
 
 #include <iostream>
 #include <chrono>
@@ -7,7 +8,7 @@
 
 using namespace async;
 
-std::unique_ptr<thread_pool> db_pool;
+std::unique_ptr<thread_pool> pool;
 
 
 void do_wait()
@@ -24,39 +25,60 @@ void do_wait()
     //end running in other thread
 }
 
+
+std::list<std::string> get_filenames_from_path(const std::string & path)
+{
+    std::cout << "searching folder from thread id = " << std::this_thread::get_id() << std::endl;
+    namespace fs = boost::filesystem;
+    fs::path someDir(path);
+    fs::directory_iterator end_iter;
+
+    std::list<std::string> result;
+
+    if ( fs::exists(someDir) && fs::is_directory(someDir))
+    {
+      for( fs::directory_iterator dir_iter(someDir) ; dir_iter != end_iter ; ++dir_iter)
+      {
+        if (fs::is_regular_file(dir_iter->status()) )
+        {
+            result.push_back(dir_iter->path().string());
+        }
+      }
+    }
+    return result;
+}
+
 void main_async (async_ctx ctx)
 {
     std::cout << "async start thread id = " << std::this_thread::get_id() << std::endl;
-    std::cout.flush();
-    int waiting_time = 999;
-    int some_value_from_database = 0;
-    db_pool->run (do_wait);
-    db_pool->run ([&]()
+
+    std::list<std::string> filenames;
+    pool->run ([&]()
     {
-        //begin running in other thread
-        std::cout << "Start wait id=" << std::this_thread::get_id() << std::endl;
-        std::cout.flush();
-        auto start = std::chrono::high_resolution_clock::now();
-        std::this_thread::sleep_for (std::chrono::milliseconds (waiting_time));
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> elapsed = end - start;
-        std::cout << "Waited " << elapsed.count() << " ms id=" << std::this_thread::get_id() << std::endl;
-        some_value_from_database = 1000;
-        std::cout.flush();
-        //end running in other thread
-    });
-    db_pool->run_and_wait (do_wait, ctx);
-    std::cout << "value from db " << some_value_from_database << std::endl;
+        filenames = get_filenames_from_path("C:\\tmp\\test_files");
+    })->wait(ctx);
+
+//    for (const std::string & filename: filenames)
+//    {
+//        std::cout << "file: " << filename << std::endl;
+//    }
+    std::vector<task_holder_ptr> tasks;
+    for (int i = 0; i < 10; ++i)
+    {
+        tasks.push_back(pool->run(do_wait));
+    }
+    wait_all(tasks, ctx);
+
     std::cout << "async done thread id = " << std::this_thread::get_id() << std::endl;
     std::cout.flush();
 
-    db_pool.reset();
+    pool.reset();
 }
 
 int main()
 {
     boost::asio::io_service io_service;
-    db_pool.reset (new thread_pool (io_service, true));
+    pool.reset (new thread_pool (io_service, true));
     boost::asio::spawn(io_service, main_async);
     io_service.run();
     return 0;
