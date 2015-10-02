@@ -1,4 +1,4 @@
-#include <iostream>
+
 #include <map>
 #include <thread>
 #include <string>
@@ -111,10 +111,18 @@ public:
     {
         if (m_io_work)
         {
-            m_io.poll();
+            m_io.stop();
+            std::size_t s = 0;
+            do
+            {
+                s = m_io.poll();
+            }
+            while (s != 0);
             m_io_work.reset();
         }
     }
+
+    boost::asio::io_service& io() const;
 
 private:
     std::mutex m_inputMutex;
@@ -141,6 +149,11 @@ thread_pool::~thread_pool()
     d->stop();
     d->waitAll();
     d->stop_io();
+}
+
+boost::asio::io_service&thread_pool::io() const
+{
+    return d->io();
 }
 
 task_holder_ptr thread_pool::run (const task& task)
@@ -177,8 +190,6 @@ void task_holder::wait(async_ctx ctx)
 
 void task_holder::done()
 {
-    std::cout << "Task holder done() thread id = " << std::this_thread::get_id() << std::endl;
-    std::cout.flush();
     m_done = true;
     if (m_timer)
     {
@@ -192,6 +203,11 @@ void wait_all(const std::vector<task_holder_ptr>& tasks, async_ctx ctx)
     {
         task->wait(ctx);
     }
+}
+
+boost::asio::io_service& thread_pool_private::io() const
+{
+return m_io;
 }
 
 

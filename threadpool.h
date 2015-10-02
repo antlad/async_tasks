@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <functional>
+
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/steady_timer.hpp>
 
@@ -56,6 +57,8 @@ public:
     task_holder_ptr run (const task& task);
 
     ~thread_pool();
+
+    boost::asio::io_service& io() const;
 
 private:
     std::unique_ptr<thread_pool_private> d;
