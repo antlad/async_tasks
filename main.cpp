@@ -52,9 +52,6 @@ void get_file_md5(const std::string & file, std::string & rv_md5)
     ,read_only
     );
 
-//    if(region.get_size() != 10000)
-//    return;
-
     //Get the address of the mapped region
     void * addr       = region.get_address();
     std::size_t size  = region.get_size();
