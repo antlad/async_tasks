@@ -118,6 +118,7 @@ public:
                 s = m_io.poll();
             }
             while (s != 0);
+            m_io.stop();
             m_io_work.reset();
         }
     }

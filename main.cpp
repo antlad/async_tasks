@@ -35,15 +35,7 @@ void get_file_md5(const std::string & file, std::string & rv_md5)
     using namespace boost::interprocess;
     //Create a file
     std::filebuf fbuf;
-    fbuf.open(file, std::ios_base::in | std::ios_base::out
-    | std::ios_base::trunc | std::ios_base::binary);
-
-    //Set the size
-    fbuf.pubseekoff(9999, std::ios_base::beg);
-    fbuf.sputc(0);
-    fbuf.close();
-
-    //Create a file mapping.
+    fbuf.open(file, std::ios_base::in);
     file_mapping m_file(file.c_str(), read_only);
 
     //Map the whole file in this process
@@ -90,12 +82,15 @@ std::vector<file_item> get_file_items_from_path(const std::string & path)
 }
 void tick_timer (async_ctx ctx)
 {
+    int i = 0;
     for(;;)
     {
+        if (!pool)
+            return;
         boost::asio::system_timer timer(pool->io());
-        timer.expires_from_now(std::chrono::milliseconds(500));
+        timer.expires_from_now(std::chrono::milliseconds(0100));
         timer.async_wait(ctx);
-        std::cout << "tick 500 ms thread id = " << std::this_thread::get_id() << std::endl;
+        std::cout << i++ << " secs. tick 1000 ms thread id = " << std::this_thread::get_id() << std::endl;
     }
 }
 
@@ -124,10 +119,10 @@ void main_async (async_ctx ctx)
     wait_all(tasks, ctx);
 
     std::cout << "async done thread id = " << std::this_thread::get_id() << std::endl;
-    for (file_item & item: fileitems)
-    {
-        std::cout << "file_name " << item.file_name << " md5 " << item.md5 << std::endl;
-    }
+//    for (file_item & item: fileitems)
+//    {
+//        std::cout << "file_name " << item.file_name << " md5 " << item.md5 << std::endl;
+//    }
 
     pool.reset();
 }
