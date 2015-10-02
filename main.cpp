@@ -88,7 +88,7 @@ void tick_timer (async_ctx ctx)
         if (!pool)
             return;
         boost::asio::system_timer timer(pool->io());
-        timer.expires_from_now(std::chrono::milliseconds(0100));
+        timer.expires_from_now(std::chrono::milliseconds(1000));
         timer.async_wait(ctx);
         std::cout << i++ << " secs. tick 1000 ms thread id = " << std::this_thread::get_id() << std::endl;
     }
@@ -119,10 +119,10 @@ void main_async (async_ctx ctx)
     wait_all(tasks, ctx);
 
     std::cout << "async done thread id = " << std::this_thread::get_id() << std::endl;
-//    for (file_item & item: fileitems)
-//    {
-//        std::cout << "file_name " << item.file_name << " md5 " << item.md5 << std::endl;
-//    }
+    for (file_item & item: fileitems)
+    {
+        std::cout << "file_name " << item.file_name << " md5 " << item.md5 << std::endl;
+    }
 
     pool.reset();
 }
