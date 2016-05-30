@@ -10,7 +10,7 @@ find_package(OpenSSL REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIR})
 link_directories(${Boost_LIBRARY_DIRS})
 
-file(GLOB SRC_LIST
+set(SRC_LIST
 main.cpp
 threadpool.h
 threadpool.cpp
