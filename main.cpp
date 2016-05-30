@@ -14,8 +14,6 @@ using namespace async;
 std::unique_ptr<thread_pool> pool;
 std::string scan_folder;
 
-
-
 void tick_timer (async_ctx ctx)
 {
     int i = 0;
