@@ -7,13 +7,9 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/steady_timer.hpp>
 
-namespace boost
-{
-namespace asio
-{
+namespace boost { namespace asio {
 class io_service;
-}
-}
+}}
 
 namespace async
 {
@@ -28,8 +24,7 @@ class task_holder
     : boost::noncopyable
 {
 public:
-    task_holder (const task& task,
-                 boost::asio::io_service& io);
+    task_holder (const task& task, boost::asio::io_service& io);
 
     void run();
 

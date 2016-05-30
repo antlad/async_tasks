@@ -8,53 +8,70 @@
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 
+#include <openssl/sha.h>
+
 #include "threadpool.h"
-#include "md5/md5.hh"
 
 using namespace async;
 
 std::unique_ptr<thread_pool> pool;
-
+std::string scan_folder;
 
 void do_wait()
 {
-    std::cout << "processing frame " << std::endl;
-    //begin running in other thread
     std::cout << "Start wait id=" << std::this_thread::get_id() << std::endl;
-
     auto start = std::chrono::high_resolution_clock::now();
     std::this_thread::sleep_for (std::chrono::milliseconds (1000));
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = end - start;
     std::cout << "Waited " << elapsed.count() << " ms id=" << std::this_thread::get_id() << std::endl;
-        //end running in other thread
 }
 
-void get_file_md5(const std::string & file, std::string & rv_md5)
+std::string base64(const unsigned char *input, int length)
+{
+    BIO *bmem, *b64;
+    BUF_MEM *bptr;
+    
+    b64 = BIO_new(BIO_f_base64());
+    bmem = BIO_new(BIO_s_mem());
+    b64 = BIO_push(b64, bmem);
+    BIO_write(b64, input, length);
+    BIO_flush(b64);
+    BIO_get_mem_ptr(b64, &bptr);
+    
+    std::string result;
+    result.resize(bptr->length);
+    //char *buff = (char *)malloc(bptr->length);
+    memcpy(result.date()), bptr->data, bptr->length–1);
+    //memcpy(result.date(), bptr->data, bptr->length–1);
+    result.data()[bptr->length–1] = 0;
+    BIO_free_all(b64);
+    
+    return result;
+}
+
+void get_file_sum(const std::string & file, std::string& rv_sum)
 {
     using namespace boost::interprocess;
-    //Create a file
     std::filebuf fbuf;
     fbuf.open(file, std::ios_base::in);
+
     file_mapping m_file(file.c_str(), read_only);
+    mapped_region region(m_file, read_only);
 
-    //Map the whole file in this process
-    mapped_region region
-    (m_file
-    ,read_only
-    );
-
-    //Get the address of the mapped region
     void * addr       = region.get_address();
     std::size_t size  = region.get_size();
-
-    rv_md5 = md5sum(addr, size);
+    
+    char hash[SHA512_DIGEST_LENGTH];
+    SHA512(addr, size, hash);
+    
+    rv_sum = base64(hash, SHA512_DIGEST_LENGTH);
 }
 
 struct file_item
 {
     std::string file_name;
-    std::string md5;
+    std::string sha512;
 };
 
 std::vector<file_item> get_file_items_from_path(const std::string & path)
@@ -66,18 +83,19 @@ std::vector<file_item> get_file_items_from_path(const std::string & path)
 
     std::vector<file_item> result;
 
-    if ( fs::exists(someDir) && fs::is_directory(someDir))
+    if (!fs::exists(someDir) || !fs::is_directory(someDir))
+        return result;
+    
+    for( fs::directory_iterator dir_iter(someDir) ; dir_iter != end_iter ; ++dir_iter)
     {
-      for( fs::directory_iterator dir_iter(someDir) ; dir_iter != end_iter ; ++dir_iter)
-      {
-        if (fs::is_regular_file(dir_iter->status()) )
-        {
-            file_item item;
-            item.file_name = dir_iter->path().string();
-            result.push_back(item);
-        }
-      }
+        if (!fs::is_regular_file(dir_iter->status()) )
+            continue;
+    
+        file_item item;
+        item.file_name = dir_iter->path().string();
+        result.push_back(item);
     }
+    
     return result;
 }
 void tick_timer (async_ctx ctx)
@@ -94,49 +112,53 @@ void tick_timer (async_ctx ctx)
     }
 }
 
-
-
 void main_async (async_ctx ctx)
 {
     std::cout << "async start thread id = " << std::this_thread::get_id() << std::endl;
 
     boost::asio::spawn(pool->io(), tick_timer);
-
-    std::vector<file_item> fileitems;
-    pool->run ([&]()
-    {
-        fileitems = get_file_items_from_path("C:\\tmp\\test_files");
-    })->wait(ctx);
+    auto fileslist = get_file_items_from_path(scan_folder);
 
     std::vector<task_holder_ptr> tasks;
     for (file_item & item: fileitems)
     {
         tasks.push_back(pool->run([&]()
         {
-            get_file_md5(item.file_name, item.md5);
+            get_file_sum(item.file_name, item.sha512);
         }));
     }
     wait_all(tasks, ctx);
 
-    std::cout << "async done thread id = " << std::this_thread::get_id() << std::endl;
     for (file_item & item: fileitems)
-    {
-        std::cout << "file_name " << item.file_name << " md5 " << item.md5 << std::endl;
-    }
+        std::cout << "file_name " << item.file_name << " sha512 " << item.sha512 << std::endl;
 
     pool.reset();
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-//    std::string md5;
-//    get_file_md5("C:\\tmp\\test_files\\file1", md5);
-//    std::cout << md5 << std::endl;
-//    return 0;
-    boost::asio::io_service io_service;
-    pool.reset(new thread_pool (io_service, true, 20));
-    boost::asio::spawn(io_service, main_async);
-    io_service.run();
+    try
+    {
+        if (argc != 2)
+            throw std::runtime_error("invalid args");
+        
+        scan_folder = std::string(argv[1]);
+        
+        boost::asio::io_service io_service;
+        pool.reset(new thread_pool (io_service, true, 20));
+        boost::asio::spawn(io_service, main_async);
+        io_service.run();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << std::endl;
+        exit(1);
+    }
+    catch(...)
+    {
+        std::cerr << "unknown exception, aborting" << std::endl;
+        exit(1);
+    }
     return 0;
 }
 
