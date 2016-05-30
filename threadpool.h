@@ -1,11 +1,10 @@
-#ifndef THREADPOOL_H
-#define THREADPOOL_H
-
-#include <memory>
-#include <functional>
+#pragma once
 
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/steady_timer.hpp>
+
+#include <memory>
+#include <functional>
 
 namespace boost { namespace asio {
 class io_service;
@@ -64,5 +63,3 @@ void wait_all(const std::vector<task_holder_ptr> & tasks, async_ctx ctx);
 
 }
 
-
-#endif // THREADPOOL_H

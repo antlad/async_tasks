@@ -1,6 +1,4 @@
-#include <iostream>
-#include <chrono>
-#include <thread>
+#include "threadpool.h"
 
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
@@ -9,8 +7,15 @@
 #include <boost/interprocess/mapped_region.hpp>
 
 #include <openssl/sha.h>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
 
-#include "threadpool.h"
+#include <fstream>
+#include <iostream>
+#include <chrono>
+#include <thread>
 
 using namespace async;
 
@@ -41,10 +46,9 @@ std::string base64(const unsigned char *input, int length)
     
     std::string result;
     result.resize(bptr->length);
-    //char *buff = (char *)malloc(bptr->length);
-    memcpy(result.date()), bptr->data, bptr->length–1);
-    //memcpy(result.date(), bptr->data, bptr->length–1);
-    result.data()[bptr->length–1] = 0;
+
+    memcpy((void *)result.data(), bptr->data, bptr->length - 1);
+    result[bptr->length -1] = 0;
     BIO_free_all(b64);
     
     return result;
@@ -63,9 +67,9 @@ void get_file_sum(const std::string & file, std::string& rv_sum)
     std::size_t size  = region.get_size();
     
     char hash[SHA512_DIGEST_LENGTH];
-    SHA512(addr, size, hash);
+    SHA512((const unsigned char*)addr, size, (unsigned char *)hash);
     
-    rv_sum = base64(hash, SHA512_DIGEST_LENGTH);
+    rv_sum = base64((const unsigned char *)hash, SHA512_DIGEST_LENGTH);
 }
 
 struct file_item
@@ -120,16 +124,15 @@ void main_async (async_ctx ctx)
     auto fileslist = get_file_items_from_path(scan_folder);
 
     std::vector<task_holder_ptr> tasks;
-    for (file_item & item: fileitems)
+    for (auto& item: fileslist)
     {
-        tasks.push_back(pool->run([&]()
-        {
+        tasks.push_back(pool->run([&](){
             get_file_sum(item.file_name, item.sha512);
         }));
     }
     wait_all(tasks, ctx);
 
-    for (file_item & item: fileitems)
+    for (const auto& item: fileslist)
         std::cout << "file_name " << item.file_name << " sha512 " << item.sha512 << std::endl;
 
     pool.reset();

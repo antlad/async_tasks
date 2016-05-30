@@ -8,8 +8,8 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 file(GLOB SRC_LIST
 main.cpp
-thread_pool.h
-thread_pool.cpp
+threadpool.h
+threadpool.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SRC_LIST})

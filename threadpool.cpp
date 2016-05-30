@@ -1,3 +1,7 @@
+#include "threadpool.h"
+
+#include <boost/asio.hpp>
+#include <boost/asio/spawn.hpp>
 
 #include <map>
 #include <thread>
@@ -5,10 +9,6 @@
 #include <mutex>
 #include <list>
 #include <condition_variable>
-#include <boost/asio.hpp>
-#include <boost/asio/spawn.hpp>
-
-#include "threadpool.h"
 
 namespace async
 {
